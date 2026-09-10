@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const num_elems: usize = 2_500_000;
+const num_elems: usize = 2_000_000;
 const quadratic_limit: usize = 50_000;
 const insertion_cutoff: usize = 12;
 
