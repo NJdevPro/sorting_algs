@@ -5,7 +5,7 @@
 #include <random>
 #include <vector>
 
-constexpr std::size_t numElems = 2'000'000+1;
+constexpr std::size_t numElems = 2'000'000;
 
 // Au-delà de cette taille, les tris en O(n²) prendraient des heures.
 constexpr std::size_t quadraticLimit = 50'000;
