@@ -1,269 +1,566 @@
 const std = @import("std");
 
-fn swap(arr: []i32, i: usize, j: usize) void {
-    const temp = arr[i];
-    arr[i] = arr[j];
-    arr[j] = temp;
+const num_elems: usize = 2_500_000;
+const quadratic_limit: usize = 50_000;
+const insertion_cutoff: usize = 12;
+
+// ============================================================
+// Utilitaires
+// ============================================================
+
+fn swap(a: []i32, i: usize, j: usize) void {
+    const tmp = a[i];
+    a[i] = a[j];
+    a[j] = tmp;
 }
 
-fn inOrder(arr: []const i32) bool {
-    const n = arr.len;
-    var i: usize = 0;
-    while (i < n - 1) : (i += 1) {
-        if (arr[i + 1] < arr[i]) return false;
-    }
-    return true;
-}
+// ============================================================
+// I Can't Believe It Can Sort
+// ============================================================
+//
+// Algorithme volontairement absurde : on parcourt le tableau
+// et, dès qu'une inversion est trouvée, on recommence depuis
+// le début.
+//
+// Cela reste quadratique dans le pire cas et sert ici
+// essentiellement d'algorithme "joke".
+// ============================================================
 
-fn printArray(arr: []const i32) void {
-    for (arr) |v| {
-        std.debug.print("{d} ", .{v});
-    }
-    std.debug.print("\n", .{});
-}
+fn i_cant_believe_it_can_sort(a: []i32) void {
+    if (a.len < 2) return;
 
-fn iCantBelieveItCanSort(arr: []i32) void {
-    const n = arr.len;
-    var i: usize = 1;
-    while (i < n) : (i += 1) {
-        var j: usize = 0;
-        while (j < i) : (j += 1) {
-            if (arr[i] < arr[j]) swap(arr, i, j);
-        }
-    }
-    std.debug.print("{}\n", .{inOrder(arr)});
-    // printArray(arr);
-}
+    var sorted = false;
 
-fn selectionSort(arr: []i32) void {
-    const n = arr.len;
-    var i: usize = 0;
-    while (i < n) : (i += 1) {
-        var minIndex = i;
-        var j = i + 1;
-        while (j < n) : (j += 1) {
-            if (arr[j] < arr[minIndex]) minIndex = j;
-        }
-        swap(arr, i, minIndex);
-    }
-    std.debug.print("{}\n", .{inOrder(arr)});
-}
+    while (!sorted) {
+        sorted = true;
 
-fn insertionSort(arr: []i32) void {
-    const n = arr.len;
-    var i: usize = 1;
-    while (i < n) : (i += 1) {
-        const key = arr[i];
-        var j: usize = i;
-        while (j > 0 and arr[j - 1] > key) : (j -= 1) {
-            arr[j] = arr[j - 1];
-        }
-        arr[j] = key;
-    }
-}
-
-fn shellSort(arr: []i32) void {
-    const n = arr.len;
-    var gap: usize = n / 2;
-    while (gap > 0) : (gap = @intFromFloat(@as(f64, @floatFromInt(gap - 1)) / 2.25)) {
-        var i: usize = gap;
-        while (i < n) : (i += 1) {
-            const temp = arr[i];
-            var j: usize = i;
-            while (j >= gap and arr[j - gap] > temp) : (j -= gap) {
-                arr[j] = arr[j - gap];
+        var i: usize = 1;
+        while (i < a.len) : (i += 1) {
+            if (a[i - 1] > a[i]) {
+                swap(a, i - 1, i);
+                sorted = false;
+                break;
             }
-            arr[j] = temp;
-        }
-    }
-    // std.debug.print("{}\n", .{inOrder(arr)});
-}
-
-fn medianOfThree(a: i32, b: i32, c: i32) i32 {
-    if ((a <= b and b <= c) or (c <= b and b <= a)) return b;
-    if ((b <= a and a <= c) or (c <= a and a <= b)) return a;
-    return c;
-}
-
-fn partition(vec: []i32, low: isize, high: isize) isize {
-    const mid = low + @divTrunc(high - low, 2);
-    const pivot = medianOfThree(vec[@intCast(low)], vec[@intCast(mid)], vec[@intCast(high)]);
-    var i: isize = low - 1;
-    var j: isize = high + 1;
-    while (true) {
-        i += 1;
-        while (vec[@intCast(i)] < pivot) : (i += 1) {}
-        j -= 1;
-        while (vec[@intCast(j)] > pivot) : (j -= 1) {}
-        if (i >= j) return j;
-        swap(vec, @intCast(i), @intCast(j));
-    }
-}
-
-fn quickSort(vec: []i32, low_in: isize, high_in: isize) void {
-    var low = low_in;
-    var high = high_in;
-    while (low < high) {
-        const pi = partition(vec, low, high);
-        if (pi - low < high - pi) {
-            quickSort(vec, low, pi); // trie récursivement la partie la plus petite
-            low = pi + 1; // optimisation en récursion terminale
-        } else {
-            quickSort(vec, pi + 1, high); // trie récursivement la partie la plus grande
-            high = pi; // optimisation en récursion terminale
         }
     }
 }
 
-fn merge(a: []i32, l: []const i32, r: []const i32, left: usize, right: usize) void {
+// ============================================================
+// Selection Sort
+// ============================================================
+
+fn selection_sort(a: []i32) void {
+    if (a.len < 2) return;
+
     var i: usize = 0;
-    var j: usize = 0;
-    var k: usize = 0;
-    while (i < left and j < right) {
-        if (l[i] <= r[j]) {
-            a[k] = l[i];
-            i += 1;
-        } else {
-            a[k] = r[j];
-            j += 1;
+
+    while (i + 1 < a.len) : (i += 1) {
+        var min_index = i;
+
+        var j = i + 1;
+        while (j < a.len) : (j += 1) {
+            if (a[j] < a[min_index]) {
+                min_index = j;
+            }
         }
-        k += 1;
-    }
-    while (i < left) : (i += 1) {
-        a[k] = l[i];
-        k += 1;
-    }
-    while (j < right) : (j += 1) {
-        a[k] = r[j];
-        k += 1;
+
+        if (min_index != i) {
+            swap(a, i, min_index);
+        }
     }
 }
 
-fn mergeSort(allocator: std.mem.Allocator, a: []i32, n: usize) !void {
-    if (n < 2) return;
+// ============================================================
+// Insertion Sort
+// ============================================================
+
+fn insertion_sort(a: []i32) void {
+    if (a.len < 2) return;
+
+    var i: usize = 1;
+
+    while (i < a.len) : (i += 1) {
+        const value = a[i];
+        var j = i;
+        while (j > 0 and a[j - 1] > value) : (j -= 1) {
+            a[j] = a[j - 1];
+        }
+        a[j] = value;
+    }
+}
+
+// ============================================================
+// Shell Sort
+// ============================================================
+
+fn shell_sort(a: []i32) void {
+    const n = a.len;
+
+    if (n < 2)
+        return;
+
+    var gap = n / 2;
+
+    while (gap > 0) {
+        var i = gap;
+        while (i < n) : (i += 1) {
+            const temp = a[i];
+            var j = i;
+            while (j >= gap and a[j - gap] > temp) {
+                a[j] = a[j - gap];
+                j -= gap;
+            }
+            a[j] = temp;
+        }
+
+        // Force la passe finale avec gap = 1.
+        if (gap == 1)
+            break;
+
+        const next_gap_f =
+            @as(f64, @floatFromInt(gap - 1)) / 2.25;
+
+        const next_gap =
+            @as(usize, @intFromFloat(next_gap_f));
+
+        gap = if (next_gap < 1) 1 else next_gap;
+    }
+}
+
+// ============================================================
+// Quick Sort
+// ============================================================
+
+fn median_of_three(a: i32, b: i32, c: i32) i32 {
+    if (a < b) {
+        if (b < c) return b;
+        if (a < c) return c;
+        return a;
+    } else {
+        if (a < c) return a;
+        if (b < c) return c;
+        return b;
+    }
+}
+
+fn partition(a: []i32, low: usize, high: usize) usize {
+    const mid = low + (high - low) / 2;
+    const pivot = median_of_three(a[low], a[mid], a[high]);
+
+    var i = low;
+    var j = high;
+
+    while (true) {
+        while (a[i] < pivot) {
+            i += 1;
+        }
+        while (a[j] > pivot) {
+            j -= 1;
+        }
+        if (i >= j) {
+            return j;
+        }
+        swap(a, i, j);
+        i += 1;
+
+        // Évite un éventuel underflow de usize.
+        if (j == 0) {
+            return 0;
+        }
+        j -= 1;
+    }
+}
+
+fn quick_sort_range(a: []i32, initial_low: usize, initial_high: usize) void {
+    var low = initial_low;
+    var high = initial_high;
+
+    while (low < high) {
+        const p = partition(a, low, high);
+
+        // On trie récursivement la plus petite partition
+        // afin de limiter la profondeur de récursion.
+        const left_size = if (p >= low) p - low + 1 else 0;
+        const right_size = if (high > p) high - p else 0;
+
+        if (left_size < right_size) {
+            if (p > low) {
+                quick_sort_range(a, low, p);
+            }
+            if (p + 1 > high) {
+                return;
+            }
+            low = p + 1;
+        } else {
+            if (p + 1 < high) {
+                quick_sort_range(a, p + 1, high);
+            }
+            if (p == 0) {
+                return;
+            }
+            high = p;
+        }
+    }
+}
+
+fn quick_sort(a: []i32) void {
+    if (a.len < 2) return;
+
+    quick_sort_range(a, 0, a.len - 1);
+}
+
+// ============================================================
+// Merge Sort
+// ============================================================
+//
+// Le buffer est de taille n.
+//
+// À chaque niveau de récursion :
+//   1. les deux moitiés sont déjà triées ;
+//   2. on copie l'ensemble dans buf ;
+//   3. on fusionne buf[0..mid] et buf[mid..n] vers a.
+//
+// Cette organisation évite tout problème lié au partage
+// du buffer entre les appels récursifs.
+// ============================================================
+
+fn merge_sort_buf(a: []i32, buf: []i32) void {
+    const n = a.len;
+
+    if (n <= 1) return;
+
+    if (n <= insertion_cutoff) {
+        insertion_sort(a);
+        return;
+    }
 
     const mid = n / 2;
-    const l = try allocator.alloc(i32, mid);
-    defer allocator.free(l);
-    const r = try allocator.alloc(i32, n - mid);
-    defer allocator.free(r);
 
-    @memcpy(l, a[0..mid]);
-    @memcpy(r, a[mid..n]);
-    try mergeSort(allocator, l, mid);
-    try mergeSort(allocator, r, n - mid);
-    merge(a, l, r, mid, n - mid);
-}
+    // Tri des deux moitiés.
+    merge_sort_buf(a[0..mid], buf);
+    merge_sort_buf(a[mid..], buf);
 
-fn heapify(array: []i32, length: usize, i: usize) void {
-    const left = 2 * i + 1;
-    const right = 2 * i + 2;
-    var largest = i;
-    if (left < length and array[left] > array[largest])
-        largest = left;
-    if (right < length and array[right] > array[largest])
-        largest = right;
-    if (largest != i) {
-        swap(array, i, largest);
-        heapify(array, length, largest);
+    // Si les deux parties sont déjà dans le bon ordre,
+    // aucune fusion n'est nécessaire.
+    if (a[mid - 1] <= a[mid]) {
+        return;
+    }
+
+    // Copie de toute la séquence dans le buffer.
+    @memcpy(buf[0..n], a);
+
+    var i: usize = 0;
+    var j: usize = mid;
+    var k: usize = 0;
+
+    // Fusion des deux moitiés.
+    while (i < mid and j < n) {
+        if (buf[i] <= buf[j]) {
+            a[k] = buf[i];
+            i += 1;
+        } else {
+            a[k] = buf[j];
+            j += 1;
+        }
+
+        k += 1;
+    }
+
+    // Éléments restants de la moitié gauche.
+    while (i < mid) : (i += 1) {
+        a[k] = buf[i];
+        k += 1;
+    }
+
+    // Éléments restants de la moitié droite.
+    while (j < n) : (j += 1) {
+        a[k] = buf[j];
+        k += 1;
     }
 }
 
-fn heapSort(array: []i32) void {
-    if (array.len == 0) return;
-    const length = array.len;
+fn merge_sort(a: []i32, buf: []i32) void {
+    merge_sort_buf(a, buf);
+}
 
-    // Part du premier élément qui n'est pas une feuille, en remontant vers la racine.
-    var i: usize = length / 2;
+// ============================================================
+// Heap Sort
+// ============================================================
+
+fn heapify(a: []i32, length: usize, initial_i: usize) void {
+    var i = initial_i;
+
+    while (true) {
+        const left = 2 * i + 1;
+        const right = left + 1;
+
+        var largest = i;
+
+        if (left < length and a[left] > a[largest]) {
+            largest = left;
+        }
+
+        if (right < length and a[right] > a[largest]) {
+            largest = right;
+        }
+
+        if (largest == i) {
+            return;
+        }
+
+        swap(a, i, largest);
+        i = largest;
+    }
+}
+
+fn heap_sort(a: []i32) void {
+    const n = a.len;
+
+    if (n < 2) return;
+
+    // Construction du tas.
+    var i = n / 2;
+
     while (i > 0) {
         i -= 1;
-        heapify(array, length, i);
+        heapify(a, n, i);
     }
 
-    i = length;
-    while (i > 0) {
-        i -= 1;
-        swap(array, 0, i);
-        heapify(array, i, 0);
+    // Extraction successive du maximum.
+    var end = n;
+
+    while (end > 1) {
+        end -= 1;
+
+        swap(a, 0, end);
+        heapify(a, end, 0);
     }
 }
+
+// ============================================================
+// Description des algorithmes
+// ============================================================
+
+const SortAlgorithm = enum {
+    i_cant_believe_it_can_sort,
+    selection_sort,
+    insertion_sort,
+    shell_sort,
+    merge_sort,
+    heap_sort,
+    quick_sort,
+};
+
+const Sorter = struct {
+    name: []const u8,
+    algorithm: SortAlgorithm,
+    quadratic: bool,
+};
+
+fn run_sort(
+    algorithm: SortAlgorithm,
+    a: []i32,
+    merge_buf: []i32,
+) void {
+    switch (algorithm) {
+        .i_cant_believe_it_can_sort =>
+            i_cant_believe_it_can_sort(a),
+
+        .selection_sort =>
+            selection_sort(a),
+
+        .insertion_sort =>
+            insertion_sort(a),
+
+        .shell_sort =>
+            shell_sort(a),
+
+        .merge_sort =>
+            merge_sort(a, merge_buf),
+
+        .heap_sort =>
+            heap_sort(a),
+
+        .quick_sort =>
+            quick_sort(a),
+    }
+}
+
+// ============================================================
+// Main
+// ============================================================
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
+
     const allocator = gpa.allocator();
 
-    const NUM_NUM: usize = 1_000_000;
+    // --------------------------------------------------------
+    // Génération du tableau initial
+    // --------------------------------------------------------
 
-    var arr = try allocator.alloc(i32, NUM_NUM);
+    const arr = try allocator.alloc(i32, num_elems);
     defer allocator.free(arr);
 
-    var prng = std.Random.DefaultPrng.init(blk: {
-        var seed: u64 = undefined;
-        try std.posix.getrandom(std.mem.asBytes(&seed));
-        break :blk seed;
-    });
-    const rand = prng.random();
+    var prng = std.Random.DefaultPrng.init(
+        @as(u64, @intCast(std.time.nanoTimestamp())),
+    );
 
-    for (0..NUM_NUM) |i| {
-        arr[i] = rand.intRangeAtMost(i32, 1, @intCast(NUM_NUM));
+    const random = prng.random();
+
+    for (arr) |*value| {
+        value.* = random.intRangeAtMost(
+            i32,
+            1,
+            @as(i32, @intCast(num_elems)),
+        );
     }
+
+    // --------------------------------------------------------
+    // Tableau de référence
+    // --------------------------------------------------------
+
+    const reference = try allocator.alloc(i32, num_elems);
+    defer allocator.free(reference);
+
+    @memcpy(reference, arr);
 
     var timer = try std.time.Timer.start();
 
-    timer.reset();
-    // iCantBelieveItCanSort(try allocator.dupe(i32, arr));
-    const iCantBelieveItCanSortTime = timer.read();
+    std.mem.sortUnstable(
+        i32,
+        reference,
+        {},
+        std.sort.asc(i32),
+    );
 
-    timer.reset();
-    // selectionSort(try allocator.dupe(i32, arr));
-    const selectionSortTime = timer.read();
+    const reference_ms = timer.read() / std.time.ns_per_ms;
 
-    timer.reset();
-    // insertionSort(try allocator.dupe(i32, arr));
-    const insertionSortTime = timer.read();
+    std.debug.print(
+        "\nSorting {} elements\n\n",
+        .{num_elems},
+    );
 
-    timer.reset();
-    {
-        const clone = try allocator.dupe(i32, arr);
-        defer allocator.free(clone);
-        shellSort(clone);
+    std.debug.print(
+        "{s:<28} {:>8} ms  {s}\n",
+        .{
+            "Reference (std.sort)",
+            reference_ms,
+            "OK",
+        },
+    );
+
+    // --------------------------------------------------------
+    // Liste des algorithmes
+    // --------------------------------------------------------
+
+    const sorters = [_]Sorter{
+        .{
+            .name = "I Can't Believe It Can Sort",
+            .algorithm = .i_cant_believe_it_can_sort,
+            .quadratic = true,
+        },
+        .{
+            .name = "Selection Sort",
+            .algorithm = .selection_sort,
+            .quadratic = true,
+        },
+        .{
+            .name = "Insertion Sort",
+            .algorithm = .insertion_sort,
+            .quadratic = true,
+        },
+        .{
+            .name = "Shell Sort",
+            .algorithm = .shell_sort,
+            .quadratic = false,
+        },
+        .{
+            .name = "Merge Sort",
+            .algorithm = .merge_sort,
+            .quadratic = false,
+        },
+        .{
+            .name = "Heap Sort",
+            .algorithm = .heap_sort,
+            .quadratic = false,
+        },
+        .{
+            .name = "QuickSort",
+            .algorithm = .quick_sort,
+            .quadratic = false,
+        },
+    };
+
+    // --------------------------------------------------------
+    // Tableau de travail
+    // --------------------------------------------------------
+
+    const work = try allocator.alloc(i32, num_elems);
+    defer allocator.free(work);
+
+    // Buffer de Merge Sort.
+    //
+    // IMPORTANT :
+    // Il fait maintenant n éléments et non n/2.
+    //
+    const merge_buf = try allocator.alloc(i32, num_elems);
+    defer allocator.free(merge_buf);
+
+    // --------------------------------------------------------
+    // Benchmarks
+    // --------------------------------------------------------
+
+    for (sorters) |sorter| {
+        if (sorter.quadratic and num_elems > quadratic_limit) {
+            std.debug.print(
+                "{s:<28} {s}\n",
+                .{
+                    sorter.name,
+                    "SKIPPED (quadratic)",
+                },
+            );
+
+            continue;
+        }
+
+        // Restaurer exactement le même tableau initial
+        // pour chaque algorithme.
+        @memcpy(work, arr);
+
+        timer.reset();
+
+        run_sort(
+            sorter.algorithm,
+            work,
+            merge_buf,
+        );
+
+        const elapsed_ms =
+            timer.read() / std.time.ns_per_ms;
+
+        const correct =
+            std.mem.eql(i32, work, reference);
+
+        if (correct) {
+            std.debug.print(
+                "{s:<28} {:>8} ms  OK\n",
+                .{
+                    sorter.name,
+                    elapsed_ms,
+                },
+            );
+        } else {
+            std.debug.print(
+                "{s:<28} {:>8} ms  ERREUR\n",
+                .{
+                    sorter.name,
+                    elapsed_ms,
+                },
+            );
+        }
     }
-    const shellSortTime = timer.read();
 
-    timer.reset();
-    {
-        const clone = try allocator.dupe(i32, arr);
-        defer allocator.free(clone);
-        // mergeSort alloue de nombreux petits tableaux temporaires ; une
-        // arena est nettement plus rapide qu'un allocateur généraliste ici.
-        var arena = std.heap.ArenaAllocator.init(allocator);
-        defer arena.deinit();
-        try mergeSort(arena.allocator(), clone, clone.len);
-    }
-    const mergeSortTime = timer.read();
-
-    timer.reset();
-    {
-        const clone = try allocator.dupe(i32, arr);
-        defer allocator.free(clone);
-        heapSort(clone);
-    }
-    const heapSortTime = timer.read();
-
-    timer.reset();
-    {
-        const clone = try allocator.dupe(i32, arr);
-        defer allocator.free(clone);
-        quickSort(clone, 0, @as(isize, @intCast(clone.len)) - 1);
-    }
-    const quickSortTime = timer.read();
-
-    std.debug.print("iCantBelieveItcan Sort time (ms): {d}\n", .{iCantBelieveItCanSortTime / 1_000_000});
-    std.debug.print("Selection Sort time (ms): {d}\n", .{selectionSortTime / 1_000_000});
-    std.debug.print("Insertion Sort time (ms): {d}\n", .{insertionSortTime / 1_000_000});
-    std.debug.print("Shell Sort time (ms)    : {d}\n", .{shellSortTime / 1_000_000});
-    std.debug.print("mergeSort Sort time (ms): {d}\n", .{mergeSortTime / 1_000_000});
-    std.debug.print("heapSort Sort time (ms): {d}\n", .{heapSortTime / 1_000_000});
-    std.debug.print("Quicksort Sort time (ms): {d}\n", .{quickSortTime / 1_000_000});
+    std.debug.print("\n", .{});
 }
