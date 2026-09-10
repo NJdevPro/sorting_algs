@@ -1,426 +1,603 @@
-#include <iostream>
-#include <vector>
-#include <random>
-#include <chrono>
 #include <algorithm>
+#include <chrono>
+#include <cstdint>
+#include <cstdio>
+#include <random>
+#include <vector>
 
-using namespace std;
+constexpr std::size_t numElems = 2'000'000+1;
 
-class SortingAlgorithms {
+// Au-delà de cette taille, les tris en O(n²) prendraient des heures.
+constexpr std::size_t quadraticLimit = 50'000;
 
-private:
+// Sous ce seuil, le tri par insertion est plus rapide que la fusion.
+constexpr std::size_t insertionCutoff = 12;
 
-    static void swap(vector<int>& arr, int i, int j) {
-        int temp = arr[i];
-        arr[i] = arr[j];
-        arr[j] = temp;
-    }
 
-public:
+// ------------------------------------------------------------
+// Utilitaires
+// ------------------------------------------------------------
 
-    static void iCantBelieveItCanSort(vector<int>& arr) {
-        int n = arr.size();
+void swapElements(std::vector<int>& a,
+                  std::size_t i,
+                  std::size_t j)
+{
+    std::swap(a[i], a[j]);
+}
 
-        for (int i = 1; i < n; i++) {
-            for (int j = 0; j < i; j++) {
-                if (arr[i] < arr[j])
-                    swap(arr, i, j);
-            }
-        }
 
-        cout << boolalpha << inOrder(arr) << endl;
-    }
+// ------------------------------------------------------------
+// I Can't Believe It Can Sort
+// ------------------------------------------------------------
 
-    static void selectionSort(vector<int>& arr) {
-        int n = arr.size();
+void iCantBelieveItCanSort(std::vector<int>& a)
+{
+    for (std::size_t i = 1; i < a.size(); ++i) {
 
-        for (int i = 0; i < n; i++) {
-            int minIndex = i;
+        for (std::size_t j = 0; j < i; ++j) {
 
-            for (int j = i + 1; j < n; j++) {
-                if (arr[j] < arr[minIndex]) {
-                    minIndex = j;
-                }
-            }
-
-            swap(arr, i, minIndex);
-        }
-
-        cout << boolalpha << inOrder(arr) << endl;
-    }
-
-    static void insertionSort(vector<int>& arr) {
-        int n = arr.size();
-
-        for (int i = 1; i < n; i++) {
-            int key = arr[i];
-            int j = i - 1;
-
-            while (j >= 0 && arr[j] > key) {
-                arr[j + 1] = arr[j];
-                j--;
-            }
-
-            arr[j + 1] = key;
-        }
-    }
-
-    static void shellSort(vector<int>& arr) {
-        int n = arr.size();
-
-        for (int gap = n / 2;
-             gap > 0;
-             gap = static_cast<int>((gap - 1) / 2.25)) {
-
-            for (int i = gap; i < n; i++) {
-                int temp = arr[i];
-                int j = i;
-
-                for (; j >= gap && arr[j - gap] > temp; j -= gap)
-                    arr[j] = arr[j - gap];
-
-                arr[j] = temp;
+            if (a[i] < a[j]) {
+                swapElements(a, i, j);
             }
         }
     }
+}
 
-private:
 
-    static int partition(vector<int>& vec, int low, int high) {
-        int mid = low + (high - low) / 2;
+// ------------------------------------------------------------
+// Selection Sort
+// ------------------------------------------------------------
 
-        int pivot = medianOfThree(
-            vec[low],
-            vec[mid],
-            vec[high]
+void selectionSort(std::vector<int>& a)
+{
+    const std::size_t n = a.size();
+
+    if (n < 2)
+        return;
+
+    for (std::size_t i = 0; i < n - 1; ++i) {
+
+        std::size_t minIndex = i;
+
+        for (std::size_t j = i + 1; j < n; ++j) {
+
+            if (a[j] < a[minIndex]) {
+                minIndex = j;
+            }
+        }
+
+        swapElements(a, i, minIndex);
+    }
+}
+
+
+// ------------------------------------------------------------
+// Insertion Sort
+// ------------------------------------------------------------
+
+void insertionSort(std::vector<int>& a)
+{
+    for (std::size_t i = 1; i < a.size(); ++i) {
+
+        const int key = a[i];
+
+        std::size_t j = i;
+
+        while (j > 0 && a[j - 1] > key) {
+
+            a[j] = a[j - 1];
+            --j;
+        }
+
+        a[j] = key;
+    }
+}
+
+
+// ------------------------------------------------------------
+// Shell Sort
+// ------------------------------------------------------------
+
+void shellSort(std::vector<int>& a)
+{
+    const std::size_t n = a.size();
+
+    if (n < 2)
+        return;
+
+    std::size_t gap = n / 2;
+
+    while (gap > 0) {
+
+        for (std::size_t i = gap; i < n; ++i) {
+
+            const int temp = a[i];
+
+            std::size_t j = i;
+
+            while (j >= gap && a[j - gap] > temp) {
+
+                a[j] = a[j - gap];
+                j -= gap;
+            }
+
+            a[j] = temp;
+        }
+
+        // Force la dernière passe avec gap = 1.
+        if (gap == 1)
+            break;
+
+        const double newGap =
+            static_cast<double>(gap - 1) / 2.25;
+
+        gap = std::max<std::size_t>(
+            1,
+            static_cast<std::size_t>(newGap)
         );
+    }
+}
 
-        int i = low - 1;
-        int j = high + 1;
 
-        while (true) {
+// ------------------------------------------------------------
+// Median of Three
+// ------------------------------------------------------------
 
-            do {
-                i++;
-            } while (vec[i] < pivot);
+int medianOfThree(int a, int b, int c)
+{
+    if ((a <= b && b <= c) ||
+        (c <= b && b <= a)) {
+        return b;
+    }
 
-            do {
-                j--;
-            } while (vec[j] > pivot);
+    if ((b <= a && a <= c) ||
+        (c <= a && a <= b)) {
+        return a;
+    }
 
-            if (i >= j)
-                return j;
+    return c;
+}
 
-            swap(vec, i, j);
+
+// ------------------------------------------------------------
+// QuickSort : partition
+// ------------------------------------------------------------
+
+std::size_t partition(std::vector<int>& a,
+                      std::size_t low,
+                      std::size_t high)
+{
+    const std::size_t mid =
+        low + (high - low) / 2;
+
+    const int pivot =
+        medianOfThree(a[low], a[mid], a[high]);
+
+    // On utilise des indices signés parce que
+    // l'algorithme commence à low - 1 et high + 1.
+    std::int64_t i =
+        static_cast<std::int64_t>(low) - 1;
+
+    std::int64_t j =
+        static_cast<std::int64_t>(high) + 1;
+
+    while (true) {
+
+        do {
+            ++i;
+        } while (a[static_cast<std::size_t>(i)] < pivot);
+
+        do {
+            --j;
+        } while (a[static_cast<std::size_t>(j)] > pivot);
+
+        if (i >= j) {
+            return static_cast<std::size_t>(j);
+        }
+
+        swapElements(
+            a,
+            static_cast<std::size_t>(i),
+            static_cast<std::size_t>(j)
+        );
+    }
+}
+
+
+// ------------------------------------------------------------
+// QuickSort
+// ------------------------------------------------------------
+
+void quickSortRange(std::vector<int>& a,
+                    std::size_t initialLow,
+                    std::size_t initialHigh)
+{
+    std::size_t low = initialLow;
+    std::size_t high = initialHigh;
+
+    while (low < high) {
+
+        const std::size_t pi =
+            partition(a, low, high);
+
+        // Trie récursivement la plus petite partie.
+        // Cela limite la profondeur de récursion.
+        if (pi - low < high - pi) {
+
+            quickSortRange(a, low, pi);
+
+            // Optimisation de la récursion terminale :
+            // on continue directement avec la grande partie.
+            low = pi + 1;
+
+        } else {
+
+            quickSortRange(a, pi + 1, high);
+
+            high = pi;
         }
     }
+}
 
-    static int medianOfThree(int a, int b, int c) {
-        if ((a <= b && b <= c) ||
-            (c <= b && b <= a))
-            return b;
 
-        if ((b <= a && a <= c) ||
-            (c <= a && a <= b))
-            return a;
-
-        return c;
+void quickSort(std::vector<int>& a)
+{
+    if (a.size() > 1) {
+        quickSortRange(a, 0, a.size() - 1);
     }
+}
 
-public:
 
-    static void quickSort(vector<int>& vec, int low, int high) {
+// ------------------------------------------------------------
+// Merge Sort
+// ------------------------------------------------------------
+//
+// Le buffer contient seulement n/2 éléments.
+// Il est alloué UNE SEULE FOIS et réutilisé pendant
+// toute la récursion.
+//
+// Comme dans la version Go, on ne copie que la moitié
+// gauche lors de la fusion.
+// ------------------------------------------------------------
 
-        while (low < high) {
+void mergeSortBuf(std::vector<int>& a,
+                  std::vector<int>& buf,
+                  std::size_t begin,
+                  std::size_t end)
+{
+    const std::size_t n = end - begin;
 
-            int pi = partition(vec, low, high);
+    // Pour les petits tableaux :
+    // insertion sort est plus rapide.
+    if (n <= insertionCutoff) {
 
-            if (pi - low < high - pi) {
+        for (std::size_t i = begin + 1; i < end; ++i) {
 
-                // Sortie récursive de la plus petite partie
-                quickSort(vec, low, pi);
+            const int key = a[i];
 
-                // Optimisation de la récursion terminale
-                low = pi + 1;
+            std::size_t j = i;
 
-            } else {
+            while (j > begin && a[j - 1] > key) {
 
-                // Sortie récursive de la plus grande partie
-                quickSort(vec, pi + 1, high);
-
-                // Optimisation de la récursion terminale
-                high = pi;
+                a[j] = a[j - 1];
+                --j;
             }
-        }
-    }
 
-    static void mergeSort(vector<int>& a, int n) {
-
-        if (n < 2)
-            return;
-
-        int mid = n / 2;
-
-        vector<int> l(mid);
-        vector<int> r(n - mid);
-
-        for (int i = 0; i < mid; i++)
-            l[i] = a[i];
-
-        for (int i = mid; i < n; i++)
-            r[i - mid] = a[i];
-
-        mergeSort(l, mid);
-        mergeSort(r, n - mid);
-
-        merge(a, l, r, mid, n - mid);
-    }
-
-private:
-
-    static void merge(
-        vector<int>& a,
-        vector<int>& l,
-        vector<int>& r,
-        int left,
-        int right
-    ) {
-        int i = 0;
-        int j = 0;
-        int k = 0;
-
-        while (i < left && j < right) {
-
-            if (l[i] <= r[j])
-                a[k++] = l[i++];
-            else
-                a[k++] = r[j++];
+            a[j] = key;
         }
 
-        while (i < left)
-            a[k++] = l[i++];
-
-        while (j < right)
-            a[k++] = r[j++];
+        return;
     }
 
-    static void heapify(
-        vector<int>& array,
-        int length,
-        int i
-    ) {
-        int left = 2 * i + 1;
-        int right = 2 * i + 2;
-        int largest = i;
+    const std::size_t mid =
+        begin + n / 2;
+
+    // Tri des deux moitiés.
+    mergeSortBuf(a, buf, begin, mid);
+    mergeSortBuf(a, buf, mid, end);
+
+    // Optimisation :
+    // les deux moitiés sont déjà dans le bon ordre.
+    if (a[mid - 1] <= a[mid]) {
+        return;
+    }
+
+    // --------------------------------------------------------
+    // Copie de la moitié gauche dans le buffer.
+    // --------------------------------------------------------
+
+    const std::size_t leftSize = mid - begin;
+
+    std::copy(
+        a.begin() + begin,
+        a.begin() + mid,
+        buf.begin()
+    );
+
+    // --------------------------------------------------------
+    // Fusion.
+    // --------------------------------------------------------
+
+    std::size_t i = 0;       // buffer / moitié gauche
+    std::size_t j = mid;     // moitié droite
+    std::size_t k = begin;   // destination
+
+    while (i < leftSize && j < end) {
+
+        if (buf[i] <= a[j]) {
+            a[k] = buf[i];
+            ++i;
+        } else {
+
+            a[k] = a[j];
+            ++j;
+        }
+        ++k;
+    }
+
+    // Les éléments restants de la moitié gauche
+    // doivent être copiés.
+    //
+    // Ceux de la moitié droite n'ont pas besoin de l'être :
+    // ils sont déjà à leur position finale.
+    std::copy(
+        buf.begin() + i,
+        buf.begin() + leftSize,
+        a.begin() + k
+    );
+}
+
+
+void mergeSort(std::vector<int>& a)
+{
+    if (a.size() < 2)
+        return;
+
+    // Un seul buffer de n/2 éléments.
+    std::vector<int> buf(a.size() / 2);
+
+    mergeSortBuf(
+        a,
+        buf,
+        0,
+        a.size()
+    );
+}
+
+
+// ------------------------------------------------------------
+// Heap Sort
+// ------------------------------------------------------------
+
+void heapify(std::vector<int>& a,
+             std::size_t length,
+             std::size_t initialI)
+{
+    std::size_t i = initialI;
+
+    while (true) {
+
+        std::size_t largest = i;
+
+        const std::size_t left =
+            2 * i + 1;
+
+        const std::size_t right =
+            2 * i + 2;
 
         if (left < length &&
-            array[left] > array[largest])
+            a[left] > a[largest]) {
+
             largest = left;
+        }
 
         if (right < length &&
-            array[right] > array[largest])
+            a[right] > a[largest]) {
+
             largest = right;
-
-        if (largest != i) {
-            swap(array, i, largest);
-            heapify(array, length, largest);
         }
-    }
 
-public:
-
-    static void heapSort(vector<int>& array) {
-
-        if (array.empty())
+        if (largest == i) {
             return;
-
-        int length = array.size();
-
-        // Construction du tas
-        for (int i = length / 2 - 1; i >= 0; i--) {
-            heapify(array, length, i);
         }
 
-        // Extraction des éléments du tas
-        for (int i = length - 1; i >= 0; i--) {
-            swap(array, 0, i);
-            heapify(array, i, 0);
-        }
+        swapElements(a, i, largest);
+
+        i = largest;
+    }
+}
+
+
+void heapSort(std::vector<int>& a)
+{
+    const std::size_t n = a.size();
+
+    if (n < 2)
+        return;
+
+    // Construction du tas.
+    for (std::size_t i = n / 2; i > 0; --i) {
+
+        heapify(a, n, i - 1);
     }
 
-    static void printArray(
-        const vector<int>& arr,
-        int n
-    ) {
-        for (int i = 0; i < n; ++i)
-            cout << arr[i] << " ";
+    // Extraction des éléments.
+    for (std::size_t i = n - 1; i > 0; --i) {
 
-        cout << endl;
+        swapElements(a, 0, i);
+
+        heapify(a, i, 0);
     }
+}
 
-    static bool inOrder(const vector<int>& arr) {
 
-        int n = arr.size();
+// ------------------------------------------------------------
+// Sorter
+// ------------------------------------------------------------
 
-        for (int i = 0; i < n - 1; ++i) {
-            if (arr[i + 1] < arr[i])
-                return false;
-        }
+struct Sorter
+{
+    const char* name;
 
-        return true;
-    }
+    void (*fn)(std::vector<int>&);
+
+    bool quadratic;
 };
 
 
-int main() {
+// ------------------------------------------------------------
+// Main
+// ------------------------------------------------------------
 
-    const int NUM_NUM = 1'000'000;
+int main()
+{
+    // --------------------------------------------------------
+    // Génération des données.
+    // --------------------------------------------------------
 
-    vector<int> arr(NUM_NUM);
-    vector<int> ord(NUM_NUM);
+    std::random_device rd;
+    std::mt19937 rng(rd());
 
-    // Générateur aléatoire
-    random_device rd;
-    mt19937 gen(rd());
-    uniform_int_distribution<int> distribution(1, NUM_NUM);
+    std::uniform_int_distribution<int> distribution(
+        1,
+        static_cast<int>(numElems)
+    );
 
-    for (int i = 0; i < NUM_NUM; i++) {
-        arr[i] = distribution(gen);
-        ord[i] = i;
+    std::vector<int> arr(numElems);
+
+    for (int& x : arr) {
+        x = distribution(rng);
     }
 
-    using namespace chrono;
 
-    // iCantBelieveItCanSort
-    auto startTime = high_resolution_clock::now();
+    // --------------------------------------------------------
+    // Référence : std::sort
+    // --------------------------------------------------------
 
-    // SortingAlgorithms::iCantBelieveItCanSort(arr);
+    std::vector<int> ref = arr;
 
-    auto endTime = high_resolution_clock::now();
+    auto start =
+        std::chrono::steady_clock::now();
 
-    auto iCantBelieveItCanSortTime =
-        duration_cast<nanoseconds>(
-            endTime - startTime
+    std::sort(ref.begin(), ref.end());
+
+    auto elapsed =
+        std::chrono::duration_cast<
+            std::chrono::milliseconds
+        >(
+            std::chrono::steady_clock::now() - start
         ).count();
 
-
-    // Selection Sort
-    startTime = high_resolution_clock::now();
-
-    // SortingAlgorithms::selectionSort(arr);
-
-    endTime = high_resolution_clock::now();
-
-    auto selectionSortTime =
-        duration_cast<nanoseconds>(
-            endTime - startTime
-        ).count();
-
-
-    // Insertion Sort
-    startTime = high_resolution_clock::now();
-
-    // SortingAlgorithms::insertionSort(arr);
-
-    endTime = high_resolution_clock::now();
-
-    auto insertionSortTime =
-        duration_cast<nanoseconds>(
-            endTime - startTime
-        ).count();
-
-
-    // Shell Sort
-    startTime = high_resolution_clock::now();
-
-    vector<int> shellArray = arr;
-    SortingAlgorithms::shellSort(shellArray);
-
-    endTime = high_resolution_clock::now();
-
-    auto shellSortTime =
-        duration_cast<nanoseconds>(
-            endTime - startTime
-        ).count();
-
-
-    // Merge Sort
-    startTime = high_resolution_clock::now();
-
-    vector<int> mergeArray = arr;
-    SortingAlgorithms::mergeSort(
-        mergeArray,
-        mergeArray.size()
+    std::printf(
+        "%-24s %6lld ms\n",
+        "std::sort (stdlib)",
+        static_cast<long long>(elapsed)
     );
 
-    endTime = high_resolution_clock::now();
 
-    auto mergeSortTime =
-        duration_cast<nanoseconds>(
-            endTime - startTime
-        ).count();
+    // --------------------------------------------------------
+    // Liste des algorithmes.
+    // --------------------------------------------------------
+
+    const Sorter sorters[] = {
+
+        {
+            "iCantBelieveItCanSort",
+            iCantBelieveItCanSort,
+            true
+        },
+
+        {
+            "Selection Sort",
+            selectionSort,
+            true
+        },
+
+        {
+            "Insertion Sort",
+            insertionSort,
+            true
+        },
+
+        {
+            "Shell Sort",
+            shellSort,
+            false
+        },
+
+        {
+            "Merge Sort",
+            mergeSort,
+            false
+        },
+
+        {
+            "Heap Sort",
+            heapSort,
+            false
+        },
+
+        {
+            "QuickSort",
+            quickSort,
+            false
+        }
+    };
 
 
-    // Heap Sort
-    startTime = high_resolution_clock::now();
+    // --------------------------------------------------------
+    // Tableau de travail réutilisé.
+    // --------------------------------------------------------
 
-    vector<int> heapArray = arr;
-    SortingAlgorithms::heapSort(heapArray);
-
-    endTime = high_resolution_clock::now();
-
-    auto heapSortTime =
-        duration_cast<nanoseconds>(
-            endTime - startTime
-        ).count();
+    std::vector<int> work(numElems);
 
 
-    // Quick Sort
-    startTime = high_resolution_clock::now();
+    // --------------------------------------------------------
+    // Benchmark.
+    // --------------------------------------------------------
 
-    vector<int> quickArray = arr;
-    SortingAlgorithms::quickSort(
-        quickArray,
-        0,
-        quickArray.size() - 1
-    );
+    for (const Sorter& s : sorters) {
 
-    endTime = high_resolution_clock::now();
+        if (s.quadratic &&
+            numElems > quadraticLimit) {
 
-    auto quickSortTime =
-        duration_cast<nanoseconds>(
-            endTime - startTime
-        ).count();
+            std::printf(
+                "%-24s ignoré (O(n²) avec n > %zu)\n",
+                s.name,
+                quadraticLimit
+            );
+
+            continue;
+        }
+
+        // Même entrée pour chaque algorithme.
+        work = arr;
+
+        start =
+            std::chrono::steady_clock::now();
+
+        s.fn(work);
+
+        elapsed =
+            std::chrono::duration_cast<
+                std::chrono::milliseconds
+            >(
+                std::chrono::steady_clock::now() - start
+            ).count();
 
 
-    // Affichage des temps
-    cout << "iCantBelieveItCanSort time (ms): "
-         << iCantBelieveItCanSortTime / 1'000'000
-         << endl;
+        // Vérification complète :
+        // mêmes valeurs ET même ordre.
+        const bool correct =
+            (work == ref);
 
-    cout << "Selection Sort time (ms): "
-         << selectionSortTime / 1'000'000
-         << endl;
-
-    cout << "Insertion Sort time (ms): "
-         << insertionSortTime / 1'000'000
-         << endl;
-
-    cout << "Shell Sort time (ms)    : "
-         << shellSortTime / 1'000'000
-         << endl;
-
-    cout << "Merge Sort time (ms)    : "
-         << mergeSortTime / 1'000'000
-         << endl;
-
-    cout << "Heap Sort time (ms)     : "
-         << heapSortTime / 1'000'000
-         << endl;
-
-    cout << "QuickSort time (ms)     : "
-         << quickSortTime / 1'000'000
-         << endl;
+        std::printf(
+            "%-24s %6lld ms  %s\n",
+            s.name,
+            static_cast<long long>(elapsed),
+            correct ? "OK" : "ERREUR"
+        );
+    }
 
     return 0;
 }
