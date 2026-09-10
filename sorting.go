@@ -2,80 +2,77 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
+	"slices"
 	"time"
 )
 
-func swap(arr []int, i, j int) {
-	temp := arr[i]
-	arr[i] = arr[j]
-	arr[j] = temp
+const (
+	numElems = 2_000_000
+
+	// Au-delà de cette taille, les tris en O(n²) prendraient des heures.
+	quadraticLimit = 50_000
+	// Sous ce seuil, le tri par insertion est plus rapide que la fusion.
+	insertionCutoff = 12
+)
+
+func swap(a []int, i, j int) {
+	a[i], a[j] = a[j], a[i]
 }
-
-func iCantBelieveItCanSort(arr []int) {
-	n := len(arr)
-
-	for i := 1; i < n; i++ {
+func iCantBelieveItCanSort(a []int) {
+	for i := 1; i < len(a); i++ {
 		for j := 0; j < i; j++ {
-			if arr[i] < arr[j] {
-				swap(arr, i, j)
+			if a[i] < a[j] {
+				swap(a, i, j)
 			}
 		}
 	}
-
-	fmt.Println(inOrder(arr))
 }
 
-func selectionSort(arr []int) {
-	n := len(arr)
-
-	for i := 0; i < n; i++ {
+func selectionSort(a []int) {
+	n := len(a)
+	for i := 0; i < n-1; i++ {
 		minIndex := i
-
 		for j := i + 1; j < n; j++ {
-			if arr[j] < arr[minIndex] {
+			if a[j] < a[minIndex] {
 				minIndex = j
 			}
 		}
-
-		swap(arr, i, minIndex)
+		swap(a, i, minIndex)
 	}
-
-	fmt.Println(inOrder(arr))
 }
 
-func insertionSort(arr []int) {
-	n := len(arr)
-
-	for i := 1; i < n; i++ {
-		key := arr[i]
+func insertionSort(a []int) {
+	for i := 1; i < len(a); i++ {
+		key := a[i]
 		j := i - 1
-
-		for j >= 0 && arr[j] > key {
-			arr[j+1] = arr[j]
+		for j >= 0 && a[j] > key {
+			a[j+1] = a[j]
 			j--
 		}
-
-		arr[j+1] = key
+		a[j+1] = key
 	}
 }
 
-func shellSort(arr []int) {
-	n := len(arr)
-
-	for gap := n / 2; gap > 0; gap = int(float64(gap-1) / 2.25) {
-
+// Correction : l'ancienne suite d'écarts pouvait passer de 2 ou 3 directement
+// à 0, sans jamais faire la passe finale avec un écart de 1 (tableau mal trié
+// pour n = 4 à 7, 12 à 19, 30 à 47...). On force désormais cette dernière passe.
+func shellSort(a []int) {
+	n := len(a)
+	for gap := n / 2; gap > 0; {
 		for i := gap; i < n; i++ {
-			temp := arr[i]
+			temp := a[i]
 			j := i
-
-			for j >= gap && arr[j-gap] > temp {
-				arr[j] = arr[j-gap]
+			for j >= gap && a[j-gap] > temp {
+				a[j] = a[j-gap]
 				j -= gap
 			}
-
-			arr[j] = temp
+			a[j] = temp
 		}
+		if gap == 1 {
+			break
+		}
+		gap = max(1, int(float64(gap-1)/2.25))
 	}
 }
 
@@ -83,275 +80,172 @@ func medianOfThree(a, b, c int) int {
 	if (a <= b && b <= c) || (c <= b && b <= a) {
 		return b
 	}
-
 	if (b <= a && a <= c) || (c <= a && a <= b) {
 		return a
 	}
-
 	return c
 }
 
-func partition(vec []int, low, high int) int {
+func partition(a []int, low, high int) int {
 	mid := low + (high-low)/2
-
-	pivot := medianOfThree(
-		vec[low],
-		vec[mid],
-		vec[high],
-	)
-
+	pivot := medianOfThree(a[low], a[mid], a[high])
 	i := low - 1
 	j := high + 1
-
 	for {
 		for {
 			i++
-			if vec[i] >= pivot {
+			if a[i] >= pivot {
 				break
 			}
 		}
-
 		for {
 			j--
-			if vec[j] <= pivot {
+			if a[j] <= pivot {
 				break
 			}
 		}
-
 		if i >= j {
 			return j
 		}
-
-		swap(vec, i, j)
+		swap(a, i, j)
 	}
 }
 
-func quickSort(vec []int, low, high int) {
-	for low < high {
-		pi := partition(vec, low, high)
+func quickSort(a []int) {
+	if len(a) > 1 {
+		quickSortRange(a, 0, len(a)-1)
+	}
+}
 
+func quickSortRange(a []int, low, high int) {
+	for low < high {
+		pi := partition(a, low, high)
 		if pi-low < high-pi {
 			// Trie récursivement la plus petite partie
-			quickSort(vec, low, pi)
-
+			quickSortRange(a, low, pi)
 			// Optimisation de la récursion terminale
 			low = pi + 1
 		} else {
-			// Trie récursivement la plus grande partie
-			quickSort(vec, pi+1, high)
-
-			// Optimisation de la récursion terminale
+			quickSortRange(a, pi+1, high)
 			high = pi
 		}
 	}
 }
 
-func mergeSort(a []int, n int) {
-	if n < 2 {
+// Allocations : un seul buffer de n/2 éléments pour tout le tri, au lieu de
+// deux slices à chaque appel récursif (~2 millions d'allocations et ~164 Mo
+// alloués pour 1M d'éléments dans la version d'origine).
+func mergeSort(a []int) {
+	if len(a) < 2 {
 		return
 	}
-
-	mid := n / 2
-
-	l := make([]int, mid)
-	r := make([]int, n-mid)
-
-	for i := 0; i < mid; i++ {
-		l[i] = a[i]
-	}
-
-	for i := mid; i < n; i++ {
-		r[i-mid] = a[i]
-	}
-
-	mergeSort(l, mid)
-	mergeSort(r, n-mid)
-
-	merge(a, l, r, mid, n-mid)
+	buf := make([]int, len(a)/2)
+	mergeSortBuf(a, buf)
 }
-
-func merge(a, l, r []int, left, right int) {
-	i := 0
-	j := 0
-	k := 0
-
-	for i < left && j < right {
-		if l[i] <= r[j] {
-			a[k] = l[i]
+func mergeSortBuf(a, buf []int) {
+	n := len(a)
+	if n <= insertionCutoff {
+		insertionSort(a)
+		return
+	}
+	mid := n / 2
+	mergeSortBuf(a[:mid], buf)
+	mergeSortBuf(a[mid:], buf)
+	if a[mid-1] <= a[mid] {
+		return // les deux moitiés sont déjà dans l'ordre
+	}
+	// On ne copie que la moitié gauche : l'écriture en k ne rattrape jamais
+	// la lecture en j, donc la moitié droite peut être lue sur place.
+	left := buf[:mid]
+	copy(left, a[:mid])
+	i, j, k := 0, mid, 0
+	for i < mid && j < n {
+		if left[i] <= a[j] {
+			a[k] = left[i]
 			i++
 		} else {
-			a[k] = r[j]
+			a[k] = a[j]
 			j++
 		}
-
-		k++
+		k++ // correction : l'original oubliait cet incrément dans une boucle
 	}
-
-	for i < left {
-		a[k] = l[i]
-		i++
-		k++
-	}
-
-	for j < right {
-		a[k] = r[j]
-		j++
-	}
+	// Les éléments restants à droite sont déjà à leur place finale.
+	copy(a[k:], left[i:])
 }
 
-func heapify(array []int, length, i int) {
-	left := 2*i + 1
-	right := 2*i + 2
-	largest := i
-
-	if left < length && array[left] > array[largest] {
-		largest = left
-	}
-
-	if right < length && array[right] > array[largest] {
-		largest = right
-	}
-
-	if largest != i {
-		swap(array, i, largest)
-		heapify(array, length, largest)
-	}
-}
-
-func heapSort(array []int) {
-	if len(array) == 0 {
-		return
-	}
-
-	length := len(array)
-
-	// Construction du tas
-	for i := length/2 - 1; i >= 0; i-- {
-		heapify(array, length, i)
-	}
-
-	// Extraction des éléments
-	for i := length - 1; i >= 0; i-- {
-		swap(array, 0, i)
-		heapify(array, i, 0)
-	}
-}
-
-func printArray(arr []int, n int) {
-	for i := 0; i < n; i++ {
-		fmt.Print(arr[i], " ")
-	}
-
-	fmt.Println()
-}
-
-func inOrder(arr []int) bool {
-	n := len(arr)
-
-	for i := 0; i < n-1; i++ {
-		if arr[i+1] < arr[i] {
-			return false
+// Version itérative : une boucle au lieu d'un appel récursif par niveau du tas.
+func heapify(a []int, length, i int) {
+	for {
+		largest := i
+		left, right := 2*i+1, 2*i+2
+		if left < length && a[left] > a[largest] {
+			largest = left
 		}
+		if right < length && a[right] > a[largest] {
+			largest = right
+		}
+		if largest == i {
+			return
+		}
+		swap(a, i, largest)
+		i = largest
 	}
+}
+func heapSort(a []int) {
+	n := len(a)
+	// Construction du tas
+	for i := n/2 - 1; i >= 0; i-- {
+		heapify(a, n, i)
+	}
+	// Extraction des éléments
+	for i := n - 1; i > 0; i-- {
+		swap(a, 0, i)
+		heapify(a, i, 0)
+	}
+}
 
-	return true
+type sorter struct {
+	name      string
+	fn        func([]int)
+	quadratic bool
 }
 
 func main() {
-
-	const NUM_NUM = 1_000_000
-
-	arr := make([]int, NUM_NUM)
-	ord := make([]int, NUM_NUM)
-
-	// Générateur aléatoire
-	rand.Seed(time.Now().UnixNano())
-
-	for i := 0; i < NUM_NUM; i++ {
-		arr[i] = rand.Intn(NUM_NUM) + 1
-		ord[i] = i
+	// Plus besoin de rand.Seed (obsolète) : math/rand/v2 est initialisé automatiquement.
+	arr := make([]int, numElems)
+	for i := range arr {
+		arr[i] = rand.IntN(numElems) + 1
 	}
-
-	// iCantBelieveItCanSort
-	startTime := time.Now()
-	// iCantBelieveItCanSort(append([]int(nil), arr...))
-	iCantBelieveItCanSortTime := time.Since(startTime)
-
-
-	// Selection Sort
-	startTime = time.Now()
-	// selectionSort(append([]int(nil), arr...))
-	selectionSortTime := time.Since(startTime)
-
-
-	// Insertion Sort
-	startTime = time.Now()
-	// insertionSort(append([]int(nil), arr...))
-	insertionSortTime := time.Since(startTime)
-
-
-	// Shell Sort
-	shellArray := append([]int(nil), arr...)
-	startTime = time.Now()
-	shellSort(shellArray)
-	shellSortTime := time.Since(startTime)
-
-
-	// Merge Sort
-	mergeArray := append([]int(nil), arr...)
-	startTime = time.Now()
-	mergeSort(mergeArray, len(mergeArray))
-	mergeSortTime := time.Since(startTime)
-
-
-	// Heap Sort
-	heapArray := append([]int(nil), arr...)
-	startTime = time.Now()
-	heapSort(heapArray)
-	heapSortTime := time.Since(startTime)
-
-
-	// Quick Sort
-	quickArray := append([]int(nil), arr...)
-	startTime = time.Now()
-	quickSort(quickArray, 0, len(quickArray)-1)
-	quickSortTime := time.Since(startTime)
-
-
-	// Affichage des temps
-	fmt.Println(
-		"iCantBelieveItCanSort time (ms):",
-		iCantBelieveItCanSortTime.Milliseconds(),
-	)
-
-	fmt.Println(
-		"Selection Sort time (ms):",
-		selectionSortTime.Milliseconds(),
-	)
-
-	fmt.Println(
-		"Insertion Sort time (ms):",
-		insertionSortTime.Milliseconds(),
-	)
-
-	fmt.Println(
-		"Shell Sort time (ms)    :",
-		shellSortTime.Milliseconds(),
-	)
-
-	fmt.Println(
-		"Merge Sort time (ms)    :",
-		mergeSortTime.Milliseconds(),
-	)
-
-	fmt.Println(
-		"Heap Sort time (ms)     :",
-		heapSortTime.Milliseconds(),
-	)
-
-	fmt.Println(
-		"QuickSort time (ms)     :",
-		quickSortTime.Milliseconds(),
-	)
-
+	// Référence : le tri de la bibliothèque standard, qui sert aussi à vérifier
+	// chaque résultat (valeurs identiques, pas seulement ordre croissant).
+	ref := slices.Clone(arr)
+	start := time.Now()
+	slices.Sort(ref)
+	fmt.Printf("%-24s %6d ms\n", "slices.Sort (stdlib)", time.Since(start).Milliseconds())
+	sorters := []sorter{
+		{"iCantBelieveItCanSort", iCantBelieveItCanSort, true},
+		{"Selection Sort", selectionSort, true},
+		{"Insertion Sort", insertionSort, true},
+		{"Shell Sort", shellSort, false},
+		{"Merge Sort", mergeSort, false},
+		{"Heap Sort", heapSort, false},
+		{"QuickSort", quickSort, false},
+	}
+	// Un seul buffer de travail réutilisé, au lieu d'une copie allouée par tri.
+	work := make([]int, numElems)
+	for _, s := range sorters {
+		if s.quadratic && numElems > quadraticLimit {
+			fmt.Printf("%-24s ignoré (O(n²) avec n > %d)\n", s.name, quadraticLimit)
+			continue
+		}
+		copy(work, arr)
+		start := time.Now()
+		s.fn(work)
+		elapsed := time.Since(start)
+		status := "OK"
+		if !slices.Equal(work, ref) {
+			status = "ERREUR"
+		}
+		fmt.Printf("%-24s %6d ms  %s\n", s.name, elapsed.Milliseconds(), status)
+	}
 }
