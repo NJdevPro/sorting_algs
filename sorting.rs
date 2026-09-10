@@ -1,320 +1,548 @@
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::Instant;
 
-fn in_order(arr: &[i32]) -> bool {
-    let n = arr.len();
-    for i in 0..n.saturating_sub(1) {
-        if arr[i + 1] < arr[i] {
-            return false;
-        }
-    }
-    true
+const NUM_ELEMS: usize = 2_000_000;
+const QUADRATIC_LIMIT: usize = 50_000;
+const INSERTION_CUTOFF: usize = 12;
+
+// ============================================================
+// Utilitaires
+// ============================================================
+
+#[inline]
+fn swap(a: &mut [i32], i: usize, j: usize) {
+    a.swap(i, j);
 }
 
-fn print_array(arr: &[i32]) {
-    for v in arr {
-        print!("{} ", v);
-    }
-    println!();
-}
+// ============================================================
+// I Can't Believe It Can Sort
+// ============================================================
 
-#[allow(dead_code)]
-fn i_cant_believe_it_can_sort(arr: &mut [i32]) {
-    let n = arr.len();
-    for i in 1..n {
-        for j in 0..i {
-            if arr[i] < arr[j] {
-                arr.swap(i, j);
+fn i_cant_believe_it_can_sort(a: &mut [i32]) {
+    if a.len() < 2 {
+        return;
+    }
+
+    let mut sorted = false;
+
+    while !sorted {
+        sorted = true;
+
+        for i in 1..a.len() {
+            if a[i - 1] > a[i] {
+                a.swap(i - 1, i);
+                sorted = false;
+                break;
             }
         }
     }
-    println!("{}", in_order(arr));
-    // print_array(arr);
 }
 
-fn selection_sort(arr: &mut [i32]) {
-    let n = arr.len();
-    for i in 0..n {
+// ============================================================
+// Selection Sort
+// ============================================================
+
+fn selection_sort(a: &mut [i32]) {
+    if a.len() < 2 {
+        return;
+    }
+
+    for i in 0..a.len() - 1 {
         let mut min_index = i;
-        for j in (i + 1)..n {
-            if arr[j] < arr[min_index] {
+
+        for j in i + 1..a.len() {
+            if a[j] < a[min_index] {
                 min_index = j;
             }
         }
-        arr.swap(i, min_index);
+
+        if min_index != i {
+            a.swap(i, min_index);
+        }
     }
-    println!("{}", in_order(arr));
 }
 
-fn insertion_sort(arr: &mut [i32]) {
-    let n = arr.len();
-    for i in 1..n {
-        let key = arr[i];
+// ============================================================
+// Insertion Sort
+// ============================================================
+
+fn insertion_sort(a: &mut [i32]) {
+    if a.len() < 2 {
+        return;
+    }
+
+    for i in 1..a.len() {
+        let value = a[i];
         let mut j = i;
-        while j > 0 && arr[j - 1] > key {
-            arr[j] = arr[j - 1];
+
+        while j > 0 && a[j - 1] > value {
+            a[j] = a[j - 1];
             j -= 1;
         }
-        arr[j] = key;
+
+        a[j] = value;
     }
 }
 
-fn shell_sort(arr: &mut [i32]) {
-    let n = arr.len();
-    let mut gap = n / 2;
-    while gap > 0 {
+// ============================================================
+// Shell Sort
+// ============================================================
+
+fn shell_sort(a: &mut [i32]) {
+    let n = a.len();
+
+    if n < 2 {
+        return;
+    }
+
+    // Knuth sequence: 1, 4, 13, 40, ...
+    let mut gap = 1;
+
+    while gap < n / 3 {
+        gap = gap * 3 + 1;
+    }
+
+    loop {
         for i in gap..n {
-            let temp = arr[i];
+            let value = a[i];
             let mut j = i;
-            while j >= gap && arr[j - gap] > temp {
-                arr[j] = arr[j - gap];
+
+            while j >= gap && a[j - gap] > value {
+                a[j] = a[j - gap];
                 j -= gap;
             }
-            arr[j] = temp;
+
+            a[j] = value;
         }
-        gap = ((gap - 1) as f64 / 2.25) as usize;
+
+        if gap == 1 {
+            break;
+        }
+
+        gap = (gap - 1) / 3;
     }
 }
+
+// ============================================================
+// QuickSort
+// ============================================================
 
 fn median_of_three(a: i32, b: i32, c: i32) -> i32 {
-    if (a <= b && b <= c) || (c <= b && b <= a) {
-        b
-    } else if (b <= a && a <= c) || (c <= a && a <= b) {
+    if a < b {
+        if b < c {
+            b
+        } else if a < c {
+            c
+        } else {
+            a
+        }
+    } else if a < c {
         a
-    } else {
+    } else if b < c {
         c
+    } else {
+        b
     }
 }
 
-fn partition(vec: &mut [i32], low: isize, high: isize) -> isize {
+fn partition(a: &mut [i32], low: usize, high: usize) -> usize {
     let mid = low + (high - low) / 2;
-    let pivot = median_of_three(vec[low as usize], vec[mid as usize], vec[high as usize]);
-    let mut i = low - 1;
-    let mut j = high + 1;
+    let pivot = median_of_three(a[low], a[mid], a[high]);
+
+    let mut i = low;
+    let mut j = high;
+
     loop {
-        i += 1;
-        while vec[i as usize] < pivot {
+        while a[i] < pivot {
             i += 1;
         }
-        j -= 1;
-        while vec[j as usize] > pivot {
+
+        while a[j] > pivot {
             j -= 1;
         }
+
         if i >= j {
             return j;
         }
-        vec.swap(i as usize, j as usize);
+
+        a.swap(i, j);
+
+        i += 1;
+        j -= 1;
     }
 }
 
-fn quick_sort(vec: &mut [i32], low_in: isize, high_in: isize) {
-    let mut low = low_in;
-    let mut high = high_in;
+fn quick_sort_range(a: &mut [i32], initial_low: usize, initial_high: usize) {
+    let mut low = initial_low;
+    let mut high = initial_high;
+
     while low < high {
-        let pi = partition(vec, low, high);
-        if pi - low < high - pi {
-            quick_sort(vec, low, pi); // trie récursivement la partie la plus petite
-            low = pi + 1; // optimisation en récursion terminale
+        let p = partition(a, low, high);
+
+        let left_size = p - low + 1;
+        let right_size = high - p;
+
+        // Trier récursivement la plus petite partition.
+        // Cela limite la profondeur de récursion.
+        if left_size < right_size {
+            if p > low {
+                quick_sort_range(a, low, p);
+            }
+
+            low = p + 1;
         } else {
-            quick_sort(vec, pi + 1, high); // trie récursivement la partie la plus grande
-            high = pi; // optimisation en récursion terminale
+            if p + 1 < high {
+                quick_sort_range(a, p + 1, high);
+            }
+
+            high = p;
         }
     }
 }
 
-// Fusionne a[0..mid] et a[mid..] en utilisant `buf` (de même taille que `a`)
-// comme mémoire de travail. `buf` est réutilisé par tous les niveaux de
-// récursion : un seul tableau auxiliaire est alloué, une seule fois, dans
-// merge_sort ci-dessous.
-fn merge_using(a: &mut [i32], buf: &mut [i32], mid: usize) {
-    buf.copy_from_slice(a);
-    let (left, right) = buf.split_at(mid);
+fn quick_sort(a: &mut [i32]) {
+    if a.len() < 2 {
+        return;
+    }
+
+    quick_sort_range(a, 0, a.len() - 1);
+}
+
+// ============================================================
+// Merge Sort
+// ============================================================
+//
+// Buffer de taille n, réutilisé par toute la récursion.
+//
+// Chaque fusion :
+//   1. les deux moitiés sont déjà triées ;
+//   2. le segment entier est copié dans buf ;
+//   3. buf est fusionné vers a.
+// ============================================================
+
+fn merge_sort_buf(a: &mut [i32], buf: &mut [i32]) {
+    let n = a.len();
+
+    if n <= 1 {
+        return;
+    }
+
+    if n <= INSERTION_CUTOFF {
+        insertion_sort(a);
+        return;
+    }
+
+    let mid = n / 2;
+
+    // Les deux moitiés utilisent le même buffer.
+    merge_sort_buf(&mut a[..mid], buf);
+    merge_sort_buf(&mut a[mid..], buf);
+
+    // Déjà trié : aucune fusion nécessaire.
+    if a[mid - 1] <= a[mid] {
+        return;
+    }
+
+    // Copie du segment courant dans le buffer.
+    buf[..n].copy_from_slice(a);
+
     let mut i = 0;
-    let mut j = 0;
+    let mut j = mid;
     let mut k = 0;
-    while i < left.len() && j < right.len() {
-        if left[i] <= right[j] {
-            a[k] = left[i];
+
+    while i < mid && j < n {
+        if buf[i] <= buf[j] {
+            a[k] = buf[i];
             i += 1;
         } else {
-            a[k] = right[j];
+            a[k] = buf[j];
             j += 1;
         }
+
         k += 1;
     }
-    while i < left.len() {
-        a[k] = left[i];
+
+    // Éléments restants à gauche.
+    while i < mid {
+        a[k] = buf[i];
         i += 1;
         k += 1;
     }
-    while j < right.len() {
-        a[k] = right[j];
+
+    // Éléments restants à droite.
+    while j < n {
+        a[k] = buf[j];
         j += 1;
         k += 1;
     }
 }
 
-fn merge_sort_with_buf(a: &mut [i32], buf: &mut [i32]) {
+fn merge_sort(a: &mut [i32], buf: &mut [i32]) {
+    merge_sort_buf(a, buf);
+}
+
+// ============================================================
+// Heap Sort
+// ============================================================
+
+fn heapify(a: &mut [i32], length: usize, initial_i: usize) {
+    let mut i = initial_i;
+
+    loop {
+        let left = 2 * i + 1;
+        let right = left + 1;
+
+        let mut largest = i;
+
+        if left < length && a[left] > a[largest] {
+            largest = left;
+        }
+
+        if right < length && a[right] > a[largest] {
+            largest = right;
+        }
+
+        if largest == i {
+            return;
+        }
+
+        a.swap(i, largest);
+        i = largest;
+    }
+}
+
+fn heap_sort(a: &mut [i32]) {
     let n = a.len();
+
     if n < 2 {
         return;
     }
-    let mid = n / 2;
-    let (a_left, a_right) = a.split_at_mut(mid);
-    let (buf_left, buf_right) = buf.split_at_mut(mid);
-    merge_sort_with_buf(a_left, buf_left);
-    merge_sort_with_buf(a_right, buf_right);
-    merge_using(a, buf, mid);
-}
 
-fn merge_sort(a: &mut [i32], n: usize) {
-    if n < 2 {
-        return;
+    // Construction du tas.
+    for i in (0..n / 2).rev() {
+        heapify(a, n, i);
     }
-    let mut buf = vec![0i32; n];
-    merge_sort_with_buf(&mut a[0..n], &mut buf);
-}
 
-fn heapify(array: &mut [i32], length: usize, i: usize) {
-    let left = 2 * i + 1;
-    let right = 2 * i + 2;
-    let mut largest = i;
-    if left < length && array[left] > array[largest] {
-        largest = left;
-    }
-    if right < length && array[right] > array[largest] {
-        largest = right;
-    }
-    if largest != i {
-        array.swap(i, largest);
-        heapify(array, length, largest);
+    // Extraction successive du maximum.
+    for end in (1..n).rev() {
+        a.swap(0, end);
+        heapify(a, end, 0);
     }
 }
 
-fn heap_sort(array: &mut [i32]) {
-    if array.is_empty() {
-        return;
-    }
-    let length = array.len();
+// ============================================================
+// Description des algorithmes
+// ============================================================
 
-    // Part du premier élément qui n'est pas une feuille, en remontant vers la racine.
-    for i in (0..length / 2).rev() {
-        heapify(array, length, i);
-    }
+#[derive(Clone, Copy)]
+enum SortAlgorithm {
+    ICantBelieveItCanSort,
+    SelectionSort,
+    InsertionSort,
+    ShellSort,
+    MergeSort,
+    HeapSort,
+    QuickSort,
+}
 
-    for i in (0..length).rev() {
-        array.swap(0, i);
-        heapify(array, i, 0);
+struct Sorter {
+    name: &'static str,
+    algorithm: SortAlgorithm,
+    quadratic: bool,
+}
+
+fn run_sort(
+    algorithm: SortAlgorithm,
+    a: &mut [i32],
+    merge_buf: &mut [i32],
+) {
+    match algorithm {
+        SortAlgorithm::ICantBelieveItCanSort =>
+            i_cant_believe_it_can_sort(a),
+
+        SortAlgorithm::SelectionSort =>
+            selection_sort(a),
+
+        SortAlgorithm::InsertionSort =>
+            insertion_sort(a),
+
+        SortAlgorithm::ShellSort =>
+            shell_sort(a),
+
+        SortAlgorithm::MergeSort =>
+            merge_sort(a, merge_buf),
+
+        SortAlgorithm::HeapSort =>
+            heap_sort(a),
+
+        SortAlgorithm::QuickSort =>
+            quick_sort(a),
     }
 }
 
-/// Petit xorshift64* : évite de dépendre de la crate `rand` pour un simple
-/// tableau d'entiers aléatoires dans ce benchmark.
-struct Xorshift64 {
+// ============================================================
+// Génération pseudo-aléatoire
+// ============================================================
+//
+// Petit générateur xorshift64 :
+// pas besoin d'une crate externe.
+// ============================================================
+
+struct XorShift64 {
     state: u64,
 }
 
-impl Xorshift64 {
+impl XorShift64 {
     fn new(seed: u64) -> Self {
-        Xorshift64 {
+        Self {
             state: if seed == 0 {
-                0x9E37_79B9_7F4A_7C15
+                0x9E3779B97F4A7C15
             } else {
                 seed
             },
         }
     }
 
+    #[inline]
     fn next_u64(&mut self) -> u64 {
         let mut x = self.state;
+
         x ^= x << 13;
         x ^= x >> 7;
         x ^= x << 17;
+
         self.state = x;
         x
     }
 
-    /// Entier aléatoire dans [low, high] inclus (équivalent à
-    /// `rand.nextInt(bound) + 1` pour low = 1).
-    fn next_range_inclusive(&mut self, low: i32, high: i32) -> i32 {
-        let span = (high - low + 1) as u64;
-        low + (self.next_u64() % span) as i32
+    #[inline]
+    fn gen_range(&mut self, max: i32) -> i32 {
+        (self.next_u64() % max as u64) as i32 + 1
     }
 }
 
-fn random_seed() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos() as u64
-}
+// ============================================================
+// Main
+// ============================================================
 
 fn main() {
-    const NUM_NUM: usize = 1000_000;
+    // --------------------------------------------------------
+    // Génération du tableau initial
+    // --------------------------------------------------------
 
-    let mut rng = Xorshift64::new(random_seed());
-    let arr: Vec<i32> = (0..NUM_NUM)
-        .map(|_| rng.next_range_inclusive(1, NUM_NUM as i32))
-        .collect();
+    let mut rng = XorShift64::new(
+        Instant::now().elapsed().as_nanos() as u64
+    );
 
-    let start = Instant::now();
-    // let mut a = arr.clone();
-    // i_cant_believe_it_can_sort(&mut a);
-    let i_cant_believe_it_can_sort_time = start.elapsed();
+    let mut arr = Vec::with_capacity(NUM_ELEMS);
 
-    let start = Instant::now();
-    // let mut a = arr.clone();
-    // selection_sort(&mut a);
-    let selection_sort_time = start.elapsed();
-
-    let start = Instant::now();
-    // let mut a = arr.clone();
-    // insertion_sort(&mut a);
-    let insertion_sort_time = start.elapsed();
-
-    let start = Instant::now();
-    {
-        let mut a = arr.clone();
-        shell_sort(&mut a);
+    for _ in 0..NUM_ELEMS {
+        arr.push(rng.gen_range(NUM_ELEMS as i32));
     }
-    let shell_sort_time = start.elapsed();
+
+    // --------------------------------------------------------
+    // Tableau de référence
+    // --------------------------------------------------------
+
+    let mut reference = arr.clone();
 
     let start = Instant::now();
-    {
-        let mut a = arr.clone();
-        let n = a.len();
-        merge_sort(&mut a, n);
-    }
-    let merge_sort_time = start.elapsed();
+    reference.sort_unstable();
+    let reference_ms = start.elapsed().as_millis();
 
-    let start = Instant::now();
-    {
-        let mut a = arr.clone();
-        heap_sort(&mut a);
-    }
-    let heap_sort_time = start.elapsed();
-
-    let start = Instant::now();
-    {
-        let mut a = arr.clone();
-        let high = (a.len() as isize) - 1;
-        quick_sort(&mut a, 0, high);
-    }
-    let quick_sort_time = start.elapsed();
+    println!();
+    println!("Sorting {} elements\n", NUM_ELEMS);
 
     println!(
-        "iCantBelieveItcan Sort time (ms): {}",
-        i_cant_believe_it_can_sort_time.as_millis()
+        "{:<28} {:>8} ms  OK",
+        "Reference (std::sort)",
+        reference_ms
     );
-    println!(
-        "Selection Sort time (ms): {}",
-        selection_sort_time.as_millis()
-    );
-    println!(
-        "Insertion Sort time (ms): {}",
-        insertion_sort_time.as_millis()
-    );
-    println!("Shell Sort time (ms)    : {}", shell_sort_time.as_millis());
-    println!("mergeSort Sort time (ms): {}", merge_sort_time.as_millis());
-    println!("heapSort Sort time (ms): {}", heap_sort_time.as_millis());
-    println!("Quicksort Sort time (ms): {}", quick_sort_time.as_millis());
+
+    // --------------------------------------------------------
+    // Liste des algorithmes
+    // --------------------------------------------------------
+
+    let sorters = [
+        Sorter {
+            name: "I Can't Believe It Can Sort",
+            algorithm: SortAlgorithm::ICantBelieveItCanSort,
+            quadratic: true,
+        },
+        Sorter {
+            name: "Selection Sort",
+            algorithm: SortAlgorithm::SelectionSort,
+            quadratic: true,
+        },
+        Sorter {
+            name: "Insertion Sort",
+            algorithm: SortAlgorithm::InsertionSort,
+            quadratic: true,
+        },
+        Sorter {
+            name: "Shell Sort",
+            algorithm: SortAlgorithm::ShellSort,
+            quadratic: false,
+        },
+        Sorter {
+            name: "Merge Sort",
+            algorithm: SortAlgorithm::MergeSort,
+            quadratic: false,
+        },
+        Sorter {
+            name: "Heap Sort",
+            algorithm: SortAlgorithm::HeapSort,
+            quadratic: false,
+        },
+        Sorter {
+            name: "QuickSort",
+            algorithm: SortAlgorithm::QuickSort,
+            quadratic: false,
+        },
+    ];
+
+    // --------------------------------------------------------
+    // Tableau de travail + buffer Merge Sort
+    // --------------------------------------------------------
+
+    let mut work = vec![0i32; NUM_ELEMS];
+    let mut merge_buf = vec![0i32; NUM_ELEMS];
+
+    // --------------------------------------------------------
+    // Benchmarks
+    // --------------------------------------------------------
+
+    for sorter in &sorters {
+        if sorter.quadratic && NUM_ELEMS > QUADRATIC_LIMIT {
+            println!(
+                "{:<28} SKIPPED (quadratic)",
+                sorter.name
+            );
+
+            continue;
+        }
+
+        // Même entrée pour chaque algorithme.
+        work.copy_from_slice(&arr);
+
+        let start = Instant::now();
+
+        run_sort(
+            sorter.algorithm,
+            &mut work,
+            &mut merge_buf,
+        );
+
+        let elapsed_ms = start.elapsed().as_millis();
+
+        let correct = work == reference;
+
+        println!(
+            "{:<28} {:>8} ms  {}",
+            sorter.name,
+            elapsed_ms,
+            if correct { "OK" } else { "ERREUR" }
+        );
+    }
+
+    println!();
 }
