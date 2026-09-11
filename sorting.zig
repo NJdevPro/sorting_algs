@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const num_elems: usize = 1000_000;
+const num_elems: usize = 1_000_000;
 const quadratic_limit: usize = 50_000;
 const insertion_cutoff: usize = 12;
 
@@ -140,16 +140,25 @@ fn partition(a: []i32, low: usize, high: usize) usize {
 fn quick_sort_range(a: []i32, initial_low: usize, initial_high: usize) void {
     var low = initial_low;
     var high = initial_high;
+    
+    while (low < high and high - low + 1 > insertion_cutoff) {
+        const p = partition(a, low, high);
 
-    while (low < high) {
-        const pi = partition(a, low, high);
-        if (pi - low < high - pi) {
-            quick_sort_range(a, low, pi);
-            low = pi + 1;
+        if (p - low < high - p) {
+            if (low < p) {
+                quick_sort_range(a, low, p);
+            }
+            low = p + 1;
         } else {
-            quick_sort_range(a, pi + 1, high);
-            high = pi;
+            if (p + 1 < high) {
+                quick_sort_range(a, p + 1, high);
+            }
+            high = p;
         }
+    }
+
+    if (low < high) {
+        insertion_sort(a[low .. high + 1]);
     }
 }
 
@@ -231,26 +240,27 @@ fn merge_sort(a: []i32, buf: []i32) void {
 // Heap Sort
 // ============================================================
 
-fn heapify(a: []i32, length: usize, initial_i: usize) void {
-    var i = initial_i;
+
+fn heapify(a: []i32, n: usize, root_arg: usize) void {
+    var root = root_arg;
 
     while (true) {
-        const left = 2 * i + 1;
-        const right = left + 1;
+        var child = 2 * root + 1;
 
-        var largest = i;
-        if (left < length and a[left] > a[largest]) {
-            largest = left;
-        }
-        if (right < length and a[right] > a[largest]) {
-            largest = right;
-        }
-        if (largest == i) {
+        if (child >= n) {
             return;
         }
 
-        swap(a, i, largest);
-        i = largest;
+        if (child + 1 < n and a[child] < a[child + 1]) {
+            child += 1;
+        }
+
+        if (a[root] >= a[child]) {
+            return;
+        }
+
+        std.mem.swap(i32, &a[root], &a[child]);
+        root = child;
     }
 }
 
@@ -270,7 +280,7 @@ fn heap_sort(a: []i32) void {
     var end = n;
     while (end > 1) {
         end -= 1;
-        swap(a, 0, end);
+        std.mem.swap(i32, &a[0], &a[end]);
         heapify(a, end, 0);
     }
 }
@@ -329,7 +339,7 @@ pub fn main() !void {
     defer allocator.free(arr);
 
     var prng = std.Random.DefaultPrng.init(
-        @as(u64, @intCast(std.time.nanoTimestamp())),
+        37, //@as(u64, @intCast(std.time.nanoTimestamp())),
     );
 
     const random = prng.random();
@@ -349,22 +359,20 @@ pub fn main() !void {
     defer allocator.free(reference);
 
     @memcpy(reference, arr);
+
     var timer = try std.time.Timer.start();
+
     std.mem.sortUnstable(i32, reference, {}, std.sort.asc(i32));
+
     const reference_ms = timer.read() / std.time.ns_per_ms;
 
     std.debug.print(
-        "\nSorting {} elements\n\n",
-        .{num_elems},
+        "\nSorting {} elements\n\n", .{num_elems},
     );
 
     std.debug.print(
         "{s:<28} {:>8} ms  {s}\n",
-        .{
-            "Reference (std.sort)",
-            reference_ms,
-            "OK",
-        },
+        .{"Reference (std.sort)", reference_ms, "OK", },
     );
 
     // --------------------------------------------------------
@@ -430,7 +438,10 @@ pub fn main() !void {
 
     for (sorters) |sorter| {
         if (sorter.quadratic and num_elems > quadratic_limit) {
-            std.debug.print("{s:<28} {s}\n",.{sorter.name,"SKIPPED (quadratic)",},);
+            std.debug.print(
+                "{s:<28} {s}\n",
+                .{sorter.name, "SKIPPED (quadratic)",},
+            );
             continue;
         }
 
@@ -445,15 +456,17 @@ pub fn main() !void {
             merge_buf,
         );
         const elapsed_ms = timer.read() / std.time.ns_per_ms;
-
         const correct = std.mem.eql(i32, work, reference);
 
         if (correct) {
-            std.debug.print("{s:<28} {:>8} ms  OK\n",.{sorter.name,elapsed_ms,},
+            std.debug.print(
+                "{s:<28} {:>8} ms  OK\n",
+                .{ sorter.name, elapsed_ms, },
             );
         } else {
             std.debug.print(
-                "{s:<28} {:>8} ms  ERREUR\n", .{sorter.name, elapsed_ms,},
+                "{s:<28} {:>8} ms  ERREUR\n",
+                .{ sorter.name, elapsed_ms, },
             );
         }
     }
