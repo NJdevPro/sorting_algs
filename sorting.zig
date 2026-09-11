@@ -27,17 +27,13 @@ fn swap(a: []i32, i: usize, j: usize) void {
 // ============================================================
 
 fn i_cant_believe_it_can_sort(a: []i32) void {
-    if (a.len < 2) return;
+    var i: usize = 1;
 
-    var sorted = false;
-    while (!sorted) {
-        sorted = true;
-        var i: usize = 1;
-        while (i < a.len) : (i += 1) {
-            if (a[i - 1] > a[i]) {
-                swap(a, i - 1, i);
-                sorted = false;
-                break;
+    while (i < a.len) : (i += 1) {
+        var j: usize = 0;
+        while (j < i) : (j += 1) {
+            if (a[i] < a[j]) {
+                swap(a, i, j);
             }
         }
     }
