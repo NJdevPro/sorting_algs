@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const num_elems: usize = 2_000_000;
+const num_elems: usize = 1000_000;
 const quadratic_limit: usize = 50_000;
 const insertion_cutoff: usize = 12;
 
@@ -27,11 +27,8 @@ fn swap(a: []i32, i: usize, j: usize) void {
 // ============================================================
 
 fn i_cant_believe_it_can_sort(a: []i32) void {
-    var i: usize = 1;
-
-    while (i < a.len) : (i += 1) {
-        var j: usize = 0;
-        while (j < i) : (j += 1) {
+    for (1..a.len) |i| {
+        for (0..i) |j| {
             if (a[i] < a[j]) {
                 swap(a, i, j);
             }
@@ -44,14 +41,10 @@ fn i_cant_believe_it_can_sort(a: []i32) void {
 // ============================================================
 
 fn selection_sort(a: []i32) void {
-    if (a.len < 2) return;
-
     var i: usize = 0;
-
     while (i + 1 < a.len) : (i += 1) {
         var min_index = i;
-        var j = i + 1;
-        while (j < a.len) : (j += 1) {
+        for (i + 1..a.len) |j| {
             if (a[j] < a[min_index]) {
                 min_index = j;
             }
@@ -67,11 +60,7 @@ fn selection_sort(a: []i32) void {
 // ============================================================
 
 fn insertion_sort(a: []i32) void {
-    if (a.len < 2) return;
-
-    var i: usize = 1;
-
-    while (i < a.len) : (i += 1) {
+    for (1..a.len) |i| {
         const value = a[i];
         var j = i;
         while (j > 0 and a[j - 1] > value) : (j -= 1) {
@@ -87,12 +76,10 @@ fn insertion_sort(a: []i32) void {
 
 fn shell_sort(a: []i32) void {
     const n = a.len;
-    if (n < 2) return;
 
     var gap = n / 2;
     while (gap > 0) {
-        var i = gap;
-        while (i < n) : (i += 1) {
+        for (gap .. n) |i| {
             const temp = a[i];
             var j = i;
             while (j >= gap and a[j - gap] > temp) {
@@ -134,12 +121,8 @@ fn partition(a: []i32, low: usize, high: usize) usize {
     var j = high;
 
     while (true) {
-        while (a[i] < pivot) {
-            i += 1;
-        }
-        while (a[j] > pivot) {
-            j -= 1;
-        }
+        while (a[i] < pivot) i += 1;
+        while (a[j] > pivot) j -= 1;
         if (i >= j) {
             return j;
         }
@@ -159,29 +142,13 @@ fn quick_sort_range(a: []i32, initial_low: usize, initial_high: usize) void {
     var high = initial_high;
 
     while (low < high) {
-        const p = partition(a, low, high);
-
-        // On trie récursivement la plus petite partition
-        // afin de limiter la profondeur de récursion.
-        const left_size = if (p >= low) p - low + 1 else 0;
-        const right_size = if (high > p) high - p else 0;
-
-        if (left_size < right_size) {
-            if (p > low) {
-                quick_sort_range(a, low, p);
-            }
-            if (p + 1 > high) {
-                return;
-            }
-            low = p + 1;
+        const pi = partition(a, low, high);
+        if (pi - low < high - pi) {
+            quick_sort_range(a, low, pi);
+            low = pi + 1;
         } else {
-            if (p + 1 < high) {
-                quick_sort_range(a, p + 1, high);
-            }
-            if (p == 0) {
-                return;
-            }
-            high = p;
+            quick_sort_range(a, pi + 1, high);
+            high = pi;
         }
     }
 }
@@ -206,7 +173,7 @@ fn quick_sort(a: []i32) void {
 // du buffer entre les appels récursifs.
 // ============================================================
 
-fn merge_sort_buf(a: []i32, buf: []i32) void {
+fn merge_sort(a: []i32, buf: []i32) void {
     const n = a.len;
     if (n <= 1) return;
 
@@ -218,8 +185,8 @@ fn merge_sort_buf(a: []i32, buf: []i32) void {
     const mid = n / 2;
 
     // Tri des deux moitiés.
-    merge_sort_buf(a[0..mid], buf);
-    merge_sort_buf(a[mid..], buf);
+    merge_sort(a[0..mid], buf);
+    merge_sort(a[mid..], buf);
 
     // Si les deux parties sont déjà dans le bon ordre,
     // aucune fusion n'est nécessaire.
@@ -259,9 +226,6 @@ fn merge_sort_buf(a: []i32, buf: []i32) void {
     }
 }
 
-fn merge_sort(a: []i32, buf: []i32) void {
-    merge_sort_buf(a, buf);
-}
 
 // ============================================================
 // Heap Sort
@@ -385,16 +349,8 @@ pub fn main() !void {
     defer allocator.free(reference);
 
     @memcpy(reference, arr);
-
     var timer = try std.time.Timer.start();
-
-    std.mem.sortUnstable(
-        i32,
-        reference,
-        {},
-        std.sort.asc(i32),
-    );
-
+    std.mem.sortUnstable(i32, reference, {}, std.sort.asc(i32));
     const reference_ms = timer.read() / std.time.ns_per_ms;
 
     std.debug.print(
@@ -474,14 +430,7 @@ pub fn main() !void {
 
     for (sorters) |sorter| {
         if (sorter.quadratic and num_elems > quadratic_limit) {
-            std.debug.print(
-                "{s:<28} {s}\n",
-                .{
-                    sorter.name,
-                    "SKIPPED (quadratic)",
-                },
-            );
-
+            std.debug.print("{s:<28} {s}\n",.{sorter.name,"SKIPPED (quadratic)",},);
             continue;
         }
 
@@ -490,31 +439,21 @@ pub fn main() !void {
         @memcpy(work, arr);
 
         timer.reset();
-
         run_sort(
             sorter.algorithm,
             work,
             merge_buf,
         );
-
         const elapsed_ms = timer.read() / std.time.ns_per_ms;
+
         const correct = std.mem.eql(i32, work, reference);
 
         if (correct) {
-            std.debug.print(
-                "{s:<28} {:>8} ms  OK\n",
-                .{
-                    sorter.name,
-                    elapsed_ms,
-                },
+            std.debug.print("{s:<28} {:>8} ms  OK\n",.{sorter.name,elapsed_ms,},
             );
         } else {
             std.debug.print(
-                "{s:<28} {:>8} ms  ERREUR\n",
-                .{
-                    sorter.name,
-                    elapsed_ms,
-                },
+                "{s:<28} {:>8} ms  ERREUR\n", .{sorter.name, elapsed_ms,},
             );
         }
     }
