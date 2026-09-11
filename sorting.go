@@ -19,6 +19,7 @@ const (
 func swap(a []int, i, j int) {
 	a[i], a[j] = a[j], a[i]
 }
+
 func iCantBelieveItCanSort(a []int) {
 	for i := 1; i < len(a); i++ {
 		for j := 0; j < i; j++ {
@@ -142,6 +143,7 @@ func mergeSort(a []int) {
 	buf := make([]int, len(a)/2)
 	mergeSortBuf(a, buf)
 }
+
 func mergeSortBuf(a, buf []int) {
 	n := len(a)
 	if n <= insertionCutoff {
@@ -191,6 +193,7 @@ func heapify(a []int, length, i int) {
 		i = largest
 	}
 }
+
 func heapSort(a []int) {
 	n := len(a)
 	// Construction du tas
@@ -216,12 +219,14 @@ func main() {
 	for i := range arr {
 		arr[i] = rand.IntN(numElems) + 1
 	}
+	
 	// Référence : le tri de la bibliothèque standard, qui sert aussi à vérifier
 	// chaque résultat (valeurs identiques, pas seulement ordre croissant).
 	ref := slices.Clone(arr)
 	start := time.Now()
 	slices.Sort(ref)
 	fmt.Printf("%-24s %6d ms\n", "slices.Sort (stdlib)", time.Since(start).Milliseconds())
+	
 	sorters := []sorter{
 		{"iCantBelieveItCanSort", iCantBelieveItCanSort, true},
 		{"Selection Sort", selectionSort, true},
@@ -231,6 +236,7 @@ func main() {
 		{"Heap Sort", heapSort, false},
 		{"QuickSort", quickSort, false},
 	}
+	
 	// Un seul buffer de travail réutilisé, au lieu d'une copie allouée par tri.
 	work := make([]int, numElems)
 	for _, s := range sorters {
