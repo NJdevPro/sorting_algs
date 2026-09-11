@@ -30,10 +30,8 @@ fn i_cant_believe_it_can_sort(a: []i32) void {
     if (a.len < 2) return;
 
     var sorted = false;
-
     while (!sorted) {
         sorted = true;
-
         var i: usize = 1;
         while (i < a.len) : (i += 1) {
             if (a[i - 1] > a[i]) {
@@ -56,14 +54,12 @@ fn selection_sort(a: []i32) void {
 
     while (i + 1 < a.len) : (i += 1) {
         var min_index = i;
-
         var j = i + 1;
         while (j < a.len) : (j += 1) {
             if (a[j] < a[min_index]) {
                 min_index = j;
             }
         }
-
         if (min_index != i) {
             swap(a, i, min_index);
         }
@@ -95,12 +91,9 @@ fn insertion_sort(a: []i32) void {
 
 fn shell_sort(a: []i32) void {
     const n = a.len;
-
-    if (n < 2)
-        return;
+    if (n < 2) return;
 
     var gap = n / 2;
-
     while (gap > 0) {
         var i = gap;
         while (i < n) : (i += 1) {
@@ -114,15 +107,9 @@ fn shell_sort(a: []i32) void {
         }
 
         // Force la passe finale avec gap = 1.
-        if (gap == 1)
-            break;
-
-        const next_gap_f =
-            @as(f64, @floatFromInt(gap - 1)) / 2.25;
-
-        const next_gap =
-            @as(usize, @intFromFloat(next_gap_f));
-
+        if (gap == 1) break;
+        const next_gap_f = @as(f64, @floatFromInt(gap - 1)) / 2.25;
+        const next_gap = @as(usize, @intFromFloat(next_gap_f));
         gap = if (next_gap < 1) 1 else next_gap;
     }
 }
@@ -205,7 +192,6 @@ fn quick_sort_range(a: []i32, initial_low: usize, initial_high: usize) void {
 
 fn quick_sort(a: []i32) void {
     if (a.len < 2) return;
-
     quick_sort_range(a, 0, a.len - 1);
 }
 
@@ -226,7 +212,6 @@ fn quick_sort(a: []i32) void {
 
 fn merge_sort_buf(a: []i32, buf: []i32) void {
     const n = a.len;
-
     if (n <= 1) return;
 
     if (n <= insertion_cutoff) {
@@ -262,7 +247,6 @@ fn merge_sort_buf(a: []i32, buf: []i32) void {
             a[k] = buf[j];
             j += 1;
         }
-
         k += 1;
     }
 
@@ -295,15 +279,12 @@ fn heapify(a: []i32, length: usize, initial_i: usize) void {
         const right = left + 1;
 
         var largest = i;
-
         if (left < length and a[left] > a[largest]) {
             largest = left;
         }
-
         if (right < length and a[right] > a[largest]) {
             largest = right;
         }
-
         if (largest == i) {
             return;
         }
@@ -315,7 +296,6 @@ fn heapify(a: []i32, length: usize, initial_i: usize) void {
 
 fn heap_sort(a: []i32) void {
     const n = a.len;
-
     if (n < 2) return;
 
     // Construction du tas.
@@ -328,10 +308,8 @@ fn heap_sort(a: []i32) void {
 
     // Extraction successive du maximum.
     var end = n;
-
     while (end > 1) {
         end -= 1;
-
         swap(a, 0, end);
         heapify(a, end, 0);
     }
@@ -363,26 +341,13 @@ fn run_sort(
     merge_buf: []i32,
 ) void {
     switch (algorithm) {
-        .i_cant_believe_it_can_sort =>
-            i_cant_believe_it_can_sort(a),
-
-        .selection_sort =>
-            selection_sort(a),
-
-        .insertion_sort =>
-            insertion_sort(a),
-
-        .shell_sort =>
-            shell_sort(a),
-
-        .merge_sort =>
-            merge_sort(a, merge_buf),
-
-        .heap_sort =>
-            heap_sort(a),
-
-        .quick_sort =>
-            quick_sort(a),
+        .i_cant_believe_it_can_sort => i_cant_believe_it_can_sort(a),
+        .selection_sort => selection_sort(a),
+        .insertion_sort => insertion_sort(a),
+        .shell_sort => shell_sort(a),
+        .merge_sort => merge_sort(a, merge_buf),
+        .heap_sort => heap_sort(a),
+        .quick_sort => quick_sort(a),
     }
 }
 
@@ -408,7 +373,6 @@ pub fn main() !void {
     );
 
     const random = prng.random();
-
     for (arr) |*value| {
         value.* = random.intRangeAtMost(
             i32,
@@ -537,11 +501,8 @@ pub fn main() !void {
             merge_buf,
         );
 
-        const elapsed_ms =
-            timer.read() / std.time.ns_per_ms;
-
-        const correct =
-            std.mem.eql(i32, work, reference);
+        const elapsed_ms = timer.read() / std.time.ns_per_ms;
+        const correct = std.mem.eql(i32, work, reference);
 
         if (correct) {
             std.debug.print(
