@@ -18,20 +18,10 @@ fn swap(a: &mut [i32], i: usize, j: usize) {
 // ============================================================
 
 fn i_cant_believe_it_can_sort(a: &mut [i32]) {
-    if a.len() < 2 {
-        return;
-    }
-
-    let mut sorted = false;
-
-    while !sorted {
-        sorted = true;
-
-        for i in 1..a.len() {
-            if a[i - 1] > a[i] {
-                a.swap(i - 1, i);
-                sorted = false;
-                break;
+    for i in 1..a.len() {
+        for j in 0..i {
+            if a[j] > a[i] {
+                a.swap(j, i);
             }
         }
     }
